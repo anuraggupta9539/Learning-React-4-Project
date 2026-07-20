@@ -3,9 +3,15 @@
 // import { Children } from "react";
 // import { createContext } from "react";
 // import PostList from "../components/PostList";
-// import { useId } from "react";
+// import { userId } from "react";
 
-import { createContext, useReducer } from "react";
+import {
+  createContext,
+  useReducer,
+  useCallback,
+  useState,
+  useEffect,
+} from "react";
 
 // const DEFAULT_CONTEXT = {
 //   PostList: [],
@@ -15,8 +21,8 @@ import { createContext, useReducer } from "react";
 
 export const PostList = createContext({
   PostList: [],
+  fetching: false,
   addPost: () => {},
-  addInitialPosts: () => {},
   deletePost: () => {},
 });
 
@@ -36,21 +42,12 @@ const postListReducer = (currPostList, action) => {
 
 const PostListProvider = ({ children }) => {
   const [postList, dispatchPostList] = useReducer(postListReducer, []);
+  const [fetching, setFetching] = useState(false);
 
-  const addPost = (useId, postTitle, postBody, reactions, tags) => {
+  const addPost = (post) => {
     dispatchPostList({
       type: "ADD_POST",
-      payload: {
-        id: Date.now(),
-        title: postTitle,
-        body: postBody,
-        reactions: {
-          likes: 0,
-          dislikes: 0,
-        },
-        useId: useId,
-        tags: tags,
-      },
+      payload: post,
     });
   };
 
@@ -63,20 +60,38 @@ const PostListProvider = ({ children }) => {
     });
   };
 
-  const deletePost = (postId) => {
-    // console.log(`delete post called for:${postId}`);
-    dispatchPostList({
-      type: "DELETE_POST",
-      payload: {
-        postId,
-      },
-    });
-  };
+  const deletePost = useCallback(
+    (postId) => {
+      // console.log(`delete post called for:${postId}`);
+      dispatchPostList({
+        type: "DELETE_POST",
+        payload: {
+          postId,
+        },
+      });
+    },
+    [dispatchPostList],
+  );
+
+  useEffect(() => {
+    setFetching(true);
+    const controller = new AbortController();
+    const signal = controller.signal;
+
+    fetch("https://dummyjson.com/posts", { signal })
+      .then((res) => res.json())
+      .then((data) => {
+        addInitialPosts(data.posts);
+        setFetching(false);
+      });
+
+    return () => {
+      controller.abort();
+    };
+  }, []);
 
   return (
-    <PostList.Provider
-      value={{ postList, addPost, addInitialPosts, deletePost }}
-    >
+    <PostList.Provider value={{ postList, fetching, addPost, deletePost }}>
       {children}
     </PostList.Provider>
   );
@@ -88,7 +103,7 @@ const PostListProvider = ({ children }) => {
 //     title: "Lorem, ipsum dolor sit amet consectetur adipisicing elit.",
 //     body: "Velit delectus quidem ipsam cupiditate qui cum, mollitia temporibus deleniti veniam a possimus labore? Ea, libero nemo. Quibusdam ratione doloribus expedita praesentium?",
 //     reactions: 2,
-//     useId: "user-9",
+//     userId: "user-9",
 //     tags: ["vacation", "Mumbai", "Enjoying"],
 //   },
 //   {
@@ -96,7 +111,7 @@ const PostListProvider = ({ children }) => {
 //     title: "Well Done",
 //     body: "Velit delectus quidem ipsam cupiditate qui cum, mollitia temporibus deleniti veniam a possimus labore? Ea, libero nemo. Quibusdam ratione doloribus expedita praesentium?",
 //     reactions: 15,
-//     useId: "user-43",
+//     userId: "user-43",
 //     tags: ["Graduating", "Unbelievable"],
 //   },
 // ];
